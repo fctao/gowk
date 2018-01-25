@@ -14,31 +14,33 @@ type ContextRouter struct {
 	errorHandler ErrorHandler
 }
 
-type HandlerResultParse interface {
+type ResponseEntity interface {
 	Execute(writer http.ResponseWriter) error
 }
 
 type StatusCode int
 
-type Handler func(ctx context.Context) HandlerResultParse
+type Handler func(ctx context.Context) ResponseEntity
 
-type ErrorHandler func(err error) HandlerResultParse
+type ErrorHandler func(err error) ResponseEntity
 
 func NewContextRouter() *ContextRouter {
 	muxRouter := mux.NewRouter()
 	return &ContextRouter{Router: muxRouter,}
 }
 
-func (r *ContextRouter) ViewHandlerFunc(handler Handler) *mux.Route {
+func (r *ContextRouter) ContextHandlerFunc(handler Handler) *mux.Route {
 	route := r.NewRoute()
 	return route.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		ctx, cancel := context.NewContext(writer, request)
 		result := handler(ctx)
-		recoverMsg := recover()
-		if nil != recoverMsg {
-			cancel()
-		}
-		r.handlerRecover(ctx, result, recoverMsg)
+		defer func() {
+			recoverMsg := recover()
+			if nil != recoverMsg {
+				cancel()
+			}
+			r.handlerRecover(ctx, result, recoverMsg)
+		}()
 	})
 }
 
@@ -46,7 +48,7 @@ func (r *ContextRouter) ErrorHandlerFunc(handler ErrorHandler) *mux.Router {
 	if nil != handler {
 		r.errorHandler = handler
 	} else {
-		r.errorHandler = func(err error) HandlerResultParse {
+		r.errorHandler = func(err error) ResponseEntity {
 			return &msg.ResponseBody{ContentType: msg.Json,
 				Data: map[string]string{
 					"status":  "500",
@@ -68,9 +70,9 @@ func (r *ContextRouter) Handler() http.Handler {
 	return r.Router
 }
 
-func (r *ContextRouter) handlerRecover(ctx context.Context, result HandlerResultParse, recoverMsg interface{}) {
+func (r *ContextRouter) handlerRecover(ctx context.Context, result ResponseEntity, recoverMsg interface{}) {
 	if nil == recoverMsg {
-		parse := result.(HandlerResultParse)
+		parse := result.(ResponseEntity)
 		err := parse.Execute(ctx.ResponseWriter())
 		if nil != err {
 			r.errorHandler(err).Execute(ctx.ResponseWriter())

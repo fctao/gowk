@@ -13,9 +13,9 @@ import (
 )
 
 type Context interface {
-	QueryParams(interface{})
-	PostForm(interface{})
-	RequestJsonBody(interface{})
+	QueryParams(interface{}) error
+	PostForm(interface{}) error
+	RequestJsonBody(interface{}) error
 	GetContext() context.Context
 	Request() *http.Request
 	ResponseWriter() http.ResponseWriter
@@ -33,39 +33,41 @@ func NewContext(w http.ResponseWriter, r *http.Request) (Context, context.Cancel
 }
 
 //query struct , and out struct too
-func (ctx *SimpleContext) QueryParams(typ interface{}) {
+func (ctx *SimpleContext) QueryParams(typ interface{}) error {
 	q := ctx.request.URL.Query()
 	err := query.Unmarshal(q, typ)
 	if nil != err {
-		panic(err)
+		return err
 	}
-	ctx.validate(typ)
+	return ctx.validate(typ)
 }
 
-func (ctx *SimpleContext) PostForm(typ interface{}) {
+func (ctx *SimpleContext) PostForm(typ interface{}) error {
 	form := ctx.request.PostForm
 	err := query.Unmarshal(form, typ)
 	if nil != err {
-		panic(err)
+		return err
 	}
-	ctx.validate(typ)
+	return ctx.validate(typ)
 }
 
-func (ctx *SimpleContext) validate(typ interface{}) {
+func (ctx *SimpleContext) validate(typ interface{}) error {
 	valid := validator.New()
 	err := valid.Struct(typ)
 	if err != nil {
 		if _, ok := err.(*validator.InvalidValidationError); ok {
-			panic(errors.New("invalid validation params"))
+			return errors.New("invalid validation params")
 		}
 		var invalidMsg string
 		for _, err := range err.(validator.ValidationErrors) {
-			invalidMsg += fmt.Sprintln(strings.Join([]string{fmt.Sprintf("field:%v", err.Field()),
+			invalidMsg += fmt.Sprintln(strings.Join([]string{
+				fmt.Sprintf("field:%v", err.Field()),
 				fmt.Sprintf("tag:%v", err.ActualTag()),
 				fmt.Sprintf("param:%v", err.Param())}, ","))
 		}
-		panic(errors.New(fmt.Sprintf("validate params has error %s", invalidMsg)))
+		return errors.New(fmt.Sprintf("validate params has error %s", invalidMsg))
 	}
+	return nil
 }
 
 func (ctx *SimpleContext) GetContext() context.Context {
@@ -73,19 +75,19 @@ func (ctx *SimpleContext) GetContext() context.Context {
 }
 
 //cast request body to json
-func (ctx *SimpleContext) RequestJsonBody(typ interface{}) {
+func (ctx *SimpleContext) RequestJsonBody(typ interface{}) error {
 	contentType := ctx.request.Header.Get("Content-Type")
 	if strings.Contains(contentType, "json") {
 		body, err := ioutil.ReadAll(ctx.request.Body)
 		if nil != err {
-			panic(err)
+			return err
 		}
 		e := json.Unmarshal(body, typ)
 		if nil != e {
-			panic(e)
+			return err
 		}
 	}
-	panic(errors.New("request body content-type is not contains json "))
+	return errors.New("request body content-type is not contains json ")
 }
 
 func (ctx *SimpleContext) Request() *http.Request {
