@@ -10,6 +10,7 @@ import (
 	"strings"
 	"net/http/httptest"
 	"encoding/json"
+	"errors"
 )
 
 func getTestContextRouter() *router.ContextRouter {
@@ -60,7 +61,43 @@ func TestQueryParams(t *testing.T) {
 	if rp.UserId != 110 || rp.Age != 18 || rp.Password != "admin" {
 		t.Error("response error")
 	}
+}
 
+func TestPanicError(t *testing.T) {
+	r := router.NewContextRouter()
+	r.ContextHandlerFunc(func(ctx context.Context) router.ResponseEntity {
+		panic(errors.New("error test"))
+	}).Path("/error")
+
+	ts := httptest.NewServer(r)
+	defer ts.Close()
+	resp, err := http.Get(ts.URL + "/error")
+	if err != nil {
+		panic(err)
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	t.Log(string(body))
+}
+
+func BenchmarkPanicError(b *testing.B) {
+	r := router.NewContextRouter()
+	r.ContextHandlerFunc(func(ctx context.Context) router.ResponseEntity {
+		panic(errors.New("error test"))
+	}).Path("/error")
+
+	ts := httptest.NewServer(r)
+	defer ts.Close()
+
+	for i := 0; i < b.N; i++ {
+		resp, err := http.Get(ts.URL + "/error")
+		if err != nil {
+			panic(err)
+		}
+		body, err := ioutil.ReadAll(resp.Body)
+		if !strings.Contains(string(body), "error test") {
+			b.Error("has error")
+		}
+	}
 }
 
 func BenchmarkServer(b *testing.B) {

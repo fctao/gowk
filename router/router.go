@@ -26,35 +26,37 @@ type ErrorHandler func(err error) ResponseEntity
 
 func NewContextRouter() *ContextRouter {
 	muxRouter := mux.NewRouter()
-	return &ContextRouter{Router: muxRouter,}
+	return &ContextRouter{Router: muxRouter, errorHandler: defaultErrorHandler}
+}
+
+func defaultErrorHandler(err error) ResponseEntity {
+	return &msg.ResponseBody{ContentType: msg.Json,
+		Data: map[string]string{
+			"status":  "500",
+			"message": err.Error(),
+		}}
 }
 
 func (r *ContextRouter) ContextHandlerFunc(handler Handler) *mux.Route {
 	route := r.NewRoute()
 	return route.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		ctx, cancel := context.NewContext(writer, request)
-		result := handler(ctx)
+		var resp ResponseEntity
+		var recoverMsg interface{}
 		defer func() {
-			recoverMsg := recover()
+			recoverMsg = recover()
 			if nil != recoverMsg {
 				cancel()
 			}
-			r.handlerRecover(ctx, result, recoverMsg)
+			r.handlerRecover(ctx, resp, recoverMsg)
 		}()
+		resp = handler(ctx)
 	})
 }
 
 func (r *ContextRouter) ErrorHandlerFunc(handler ErrorHandler) *mux.Router {
 	if nil != handler {
 		r.errorHandler = handler
-	} else {
-		r.errorHandler = func(err error) ResponseEntity {
-			return &msg.ResponseBody{ContentType: msg.Json,
-				Data: map[string]string{
-					"status":  "500",
-					"message": err.Error(),
-				}}
-		}
 	}
 	return r.Router
 }
