@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"strings"
 	"net/http/httptest"
+	"encoding/json"
 )
 
 func getTestContextRouter() *router.ContextRouter {
@@ -25,12 +26,49 @@ func getTestContextRouter() *router.ContextRouter {
 	return r
 }
 
+type Person struct {
+	UserId   int    `query:"user_id",json:"user_id",validate:"gte=0,lt=1000"`
+	Age      int    `query:"age",json:"age"`
+	Password string `query:"password",json:"password"`
+}
+
+func TestQueryParams(t *testing.T) {
+	r := router.NewContextRouter()
+
+	r.ContextHandlerFunc(func(ctx context.Context) router.ResponseEntity {
+		p := &Person{}
+		ctx.QueryParams(p)
+		return &msg.ResponseBody{
+			ContentType: msg.Json,
+			Data:        p,
+		}
+	}).Path("/hello")
+	ts := httptest.NewServer(r)
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/hello?user_id=110&age=18&password=admin")
+	if err != nil {
+		panic(err)
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	rp := &Person{}
+	e := json.Unmarshal(body, rp)
+	if nil != e {
+		t.Error(e)
+	}
+
+	if rp.UserId != 110 || rp.Age != 18 || rp.Password != "admin" {
+		t.Error("response error")
+	}
+
+}
+
 func BenchmarkServer(b *testing.B) {
 	ts := httptest.NewServer(getTestContextRouter())
 	defer ts.Close()
 
 	for i := 0; i < b.N; i++ {
-		resp, err := http.Get(ts.URL+"/hello")
+		resp, err := http.Get(ts.URL + "/hello")
 		if err != nil {
 			panic(err)
 		}
