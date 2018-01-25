@@ -2,6 +2,7 @@
 1. router.NewContextRouter instance of http.handler
 2. run gowk.Server, can use ```kill -USR2 pid``` restart server
 
+### def app
 ```
 func Server(addr string, r *router.ContextRouter, preStartHook func() error) error {
 	opt := gracehttp.PreStartProcess(preStartHook)
@@ -13,6 +14,7 @@ func Server(addr string, r *router.ContextRouter, preStartHook func() error) err
 	)
 }
 ```
+
 ### router example
 ```
 	r := router.NewContextRouter()
@@ -23,6 +25,28 @@ func Server(addr string, r *router.ContextRouter, preStartHook func() error) err
 				"status":  "200",
 				"message": "hello world",
 			},
+		}
+	}).Path("/hello")
+```
+
+
+### query params cast to struct and validate params values
+#### def struct
+```
+type Person struct {
+	UserId   int    `query:"user_id",json:"user_id",validate:"gte=0,lt=1000"`
+	Age      int    `query:"age",json:"age"`
+	Password string `query:"password",json:"password"`
+}
+```
+#### def handler
+```
+	r.ContextHandlerFunc(func(ctx context.Context) router.ResponseEntity {
+		p := &Person{}
+		ctx.QueryParams(p)
+		return &msg.ResponseBody{
+			ContentType: msg.Json,
+			Data:        p,
 		}
 	}).Path("/hello")
 ```

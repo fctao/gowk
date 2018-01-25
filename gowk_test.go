@@ -35,7 +35,6 @@ type Person struct {
 
 func TestQueryParams(t *testing.T) {
 	r := router.NewContextRouter()
-
 	r.ContextHandlerFunc(func(ctx context.Context) router.ResponseEntity {
 		p := &Person{}
 		ctx.QueryParams(p)
