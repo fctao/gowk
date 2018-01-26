@@ -82,10 +82,11 @@ func (ctx *SimpleContext) RequestJsonBody(typ interface{}) error {
 		if nil != err {
 			return err
 		}
-		e := json.Unmarshal(body, typ)
-		if nil != e {
+		err = json.Unmarshal(body, typ)
+		if nil != err {
 			return err
 		}
+		return ctx.validate(typ)
 	}
 	return errors.New("request body content-type is not contains json ")
 }
